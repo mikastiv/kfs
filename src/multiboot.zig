@@ -23,12 +23,6 @@ pub const Header = extern struct {
         mem_info: bool,
         video_mode: bool,
         padding: u29 = 0,
-
-        pub const default: Flags = .{
-            .module_align = true,
-            .mem_info = true,
-            .video_mode = false,
-        };
     };
 
     pub fn calculateChecksum(flags: Flags) u32 {
