@@ -14,21 +14,25 @@ pub fn build(b: *std.Build) void {
     const kernel = b.addExecutable(.{
         .name = "kfs",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
+            .root_source_file = b.path("src/kernel/i386/main.zig"),
             .target = target,
             .optimize = optimize,
             .code_model = .kernel,
             .strip = false,
         }),
     });
-    kernel.setLinkerScript(b.path("src/linker.ld"));
+    kernel.setLinkerScript(b.path("src/kernel/i386/linker.ld"));
     b.installArtifact(kernel);
 
     const kernel_path = kernel.getEmittedBin();
     const iso = b.getInstallPath(.bin, "kfs.iso");
 
     const wf = b.addWriteFiles();
-    _ = wf.addCopyFile(b.path("grub.cfg"), "boot/grub/grub.cfg");
+    _ = wf.add("boot/grub/grub.cfg",
+        \\menuentry "kfs" {
+        \\    multiboot /boot/kfs
+        \\}
+    );
     _ = wf.addCopyFile(kernel_path, "boot/kfs");
     const isodir = wf.getDirectory();
 

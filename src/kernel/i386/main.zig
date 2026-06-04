@@ -1,8 +1,10 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
+pub const panic = @import("panic.zig").panic;
+
 const multiboot = @import("multiboot.zig");
-const vga = @import("vga.zig");
+const tty = @import("tty.zig");
 
 const multiboot_flags: multiboot.Header.Flags = .{
     .module_align = true,
@@ -61,9 +63,9 @@ const Framebuffer = struct {
 };
 
 noinline fn kmain(magic: u32, info: *multiboot.Info) callconv(.c) noreturn {
-    vga.init();
+    tty.init();
 
-    vga.print("magic: {x}\n", .{magic});
+    tty.print("magic: {x}\n", .{magic});
 
     const raw_pixels: [*]u8 = @ptrFromInt(@as(u32, @truncate(info.framebuffer.addr)));
     const framebuffer_size = info.framebuffer.pitch * info.framebuffer.height;
