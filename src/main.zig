@@ -7,7 +7,7 @@ const vga = @import("vga.zig");
 const multiboot_flags: multiboot.Header.Flags = .{
     .module_align = true,
     .mem_info = true,
-    .video_mode = true,
+    .video_mode = false,
 };
 
 export const multiboot_header: multiboot.Header align(4) linksection(".multiboot") = .{
@@ -75,10 +75,7 @@ noinline fn kmain(magic: u32, info: *multiboot.Info) callconv(.c) noreturn {
         .pitch = info.framebuffer.pitch,
         .height = info.framebuffer.height,
     };
-
-    for (0..16) |i| {
-        framebuffer.putPixel(5, i, 0xff, 0, 0xff);
-    }
+    _ = framebuffer; // autofix
 
     asm volatile ("cli");
     while (true) {
