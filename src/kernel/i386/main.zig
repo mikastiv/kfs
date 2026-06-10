@@ -45,8 +45,13 @@ noinline fn kmain(magic: u32, info: *multiboot.Info) callconv(.c) noreturn {
     tty.init();
     framebuffer.init(info);
 
-    tty.print("magic: {x}\n", .{magic});
+    framebuffer.setColor(.orange, .black);
+    framebuffer.clear();
 
+    tty.print("multiboot magic: 0x{x}\n", .{magic});
+    tty.print("Hello, Kernel!\n", .{});
+
+    framebuffer.print("multiboot magic: 0x{x}\n", .{magic});
     framebuffer.print("Hello, Kernel!\n", .{});
 
     asm volatile ("cli");

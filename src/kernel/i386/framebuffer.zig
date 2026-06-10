@@ -57,6 +57,15 @@ pub const Color = struct {
     pub const magenta: Color = .{ .r = 0xff, .g = 0, .b = 0xff };
     pub const cyan: Color = .{ .r = 0, .g = 0xff, .b = 0xff };
     pub const yellow: Color = .{ .r = 0xff, .g = 0xff, .b = 0 };
+    pub const orange: Color = .{ .r = 0xff, .g = 0xa5, .b = 0 };
+
+    pub fn toInt(self: Color) u32 {
+        var result: u32 = 0;
+        result |= @as(u32, self.r) << @intCast(red_index * 8);
+        result |= @as(u32, self.g) << @intCast(green_index * 8);
+        result |= @as(u32, self.b) << @intCast(blue_index * 8);
+        return result;
+    }
 };
 
 pub fn init(info: *const multiboot.Info) void {
@@ -92,7 +101,7 @@ pub fn init(info: *const multiboot.Info) void {
 }
 
 pub fn clear() void {
-    @memset(pixels, 0);
+    @memset(std.mem.bytesAsSlice(u32, pixels), bg.toInt());
 }
 
 pub fn putPixel(x: u32, y: u32, color: Color) void {
@@ -101,13 +110,10 @@ pub fn putPixel(x: u32, y: u32, color: Color) void {
 
     const index = (y * pitch) + (x * bpp / 8);
     switch (bpp) {
-        32, 24 => {
+        32 => {
             pixels[index + blue_index] = color.b;
             pixels[index + green_index] = color.g;
             pixels[index + red_index] = color.r;
-            if (bpp == 32) {
-                pixels[index + 3] = 0xff;
-            }
         },
         else => @panic("unsupported bpp"),
     }
@@ -192,7 +198,9 @@ fn scroll() void {
     const scanline_size = pitch * font.glyph_height;
     const frambuffer_size = pitch * height;
     @memmove(pixels[0 .. frambuffer_size - scanline_size], pixels[scanline_size..]);
-    @memset(pixels[frambuffer_size - scanline_size ..], 0);
+
+    const last_row = std.mem.bytesAsSlice(u32, pixels[frambuffer_size - scanline_size ..]);
+    @memset(last_row, bg.toInt());
 }
 
 fn drain(w: *std.Io.Writer, data: []const []const u8, splat: usize) !usize {

@@ -1,12 +1,14 @@
 const std = @import("std");
 
-const Bootloader = enum {
-    multiboot,
-    limine,
+const FontSize = enum {
+    @"8x16",
+    @"16x32",
 };
 
+const Target = std.Target.x86;
+const font_size: FontSize = .@"8x16";
+
 pub fn build(b: *std.Build) void {
-    const Target = std.Target.x86;
     const target = b.resolveTargetQuery(.{
         .cpu_arch = .x86,
         .os_tag = .freestanding,
@@ -26,7 +28,10 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    const console_font_path = "fonts/ter-v32n.psf";
+    const console_font_path = switch (font_size) {
+        .@"8x16" => "fonts/ter-v16n.psf",
+        .@"16x32" => "fonts/ter-v32n.psf",
+    };
     const psf_step = b.addRunArtifact(psf_to_bin);
     psf_step.addPrefixedFileArg("--input-file=", b.path(console_font_path));
     const console_font = psf_step.addPrefixedOutputFileArg("--output-file=", console_font_path);
