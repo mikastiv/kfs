@@ -59,6 +59,8 @@ pub fn build(b: *std.Build) void {
 
     const grub_wf = b.addWriteFiles();
     _ = grub_wf.add("boot/grub/grub.cfg",
+        \\set timeout=0
+        \\set default="0"
         \\menuentry "kfs" {
         \\    multiboot /boot/kfs
         \\}

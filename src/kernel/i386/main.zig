@@ -43,14 +43,11 @@ export fn _start() callconv(.naked) noreturn {
 
 noinline fn kmain(magic: u32, info: *multiboot.Info) callconv(.c) noreturn {
     tty.init();
-    tty.print("magic: {x}\n", .{magic});
     framebuffer.init(info);
 
-    framebuffer.print("Hello, World!\n", .{});
+    tty.print("magic: {x}\n", .{magic});
+
     framebuffer.print("Hello, Kernel!\n", .{});
-    for (0..22) |i| {
-        framebuffer.print("{d}\n", .{i});
-    }
 
     asm volatile ("cli");
     while (true) {

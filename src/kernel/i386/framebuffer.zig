@@ -9,13 +9,16 @@ var pixels: []u8 = undefined;
 var bpp: u32 = 0;
 var pitch: u32 = 0;
 var width: u32 = 0;
-var size: u32 = 0;
 var height: u32 = 0;
 var cursor_width: u32 = 0;
 var cursor_height: u32 = 0;
 var font: ConsoleFont = undefined;
 var fg: Color = .white;
 var bg: Color = .black;
+
+var red_index: u32 = 0;
+var green_index: u32 = 0;
+var blue_index: u32 = 0;
 
 var column: usize = 0;
 var row: usize = 0;
@@ -57,15 +60,22 @@ pub const Color = struct {
 };
 
 pub fn init(info: *const multiboot.Info) void {
+    assert(info.framebuffer.type == .rgb);
+    assert(info.framebuffer.mode.rgb.red_mask_size == 8);
+    assert(info.framebuffer.mode.rgb.green_mask_size == 8);
+    assert(info.framebuffer.mode.rgb.blue_mask_size == 8);
+
     font = .init(font_binary);
     fg = .white;
     bg = .black;
 
     const raw_pixels: [*]u8 = @ptrFromInt(@as(u32, @truncate(info.framebuffer.addr)));
-    size = info.framebuffer.pitch * info.framebuffer.height;
-    pixels = raw_pixels[0..size];
-    // TODO: check rgb masks
-    assert(info.framebuffer.type == .rgb);
+    const framebuffer_size = info.framebuffer.pitch * info.framebuffer.height;
+    pixels = raw_pixels[0..framebuffer_size];
+
+    red_index = info.framebuffer.mode.rgb.red_field_position / 8;
+    green_index = info.framebuffer.mode.rgb.green_field_position / 8;
+    blue_index = info.framebuffer.mode.rgb.blue_field_position / 8;
 
     bpp = info.framebuffer.bpp;
     pitch = info.framebuffer.pitch;
@@ -92,9 +102,9 @@ pub fn putPixel(x: u32, y: u32, color: Color) void {
     const index = (y * pitch) + (x * bpp / 8);
     switch (bpp) {
         32, 24 => {
-            pixels[index + 0] = color.b;
-            pixels[index + 1] = color.g;
-            pixels[index + 2] = color.r;
+            pixels[index + blue_index] = color.b;
+            pixels[index + green_index] = color.g;
+            pixels[index + red_index] = color.r;
             if (bpp == 32) {
                 pixels[index + 3] = 0xff;
             }
@@ -180,8 +190,9 @@ fn incrementRow() void {
 
 fn scroll() void {
     const scanline_size = pitch * font.glyph_height;
-    @memmove(pixels[0 .. size - scanline_size], pixels[scanline_size..]);
-    @memset(pixels[size - scanline_size ..], 0);
+    const frambuffer_size = pitch * height;
+    @memmove(pixels[0 .. frambuffer_size - scanline_size], pixels[scanline_size..]);
+    @memset(pixels[frambuffer_size - scanline_size ..], 0);
 }
 
 fn drain(w: *std.Io.Writer, data: []const []const u8, splat: usize) !usize {
