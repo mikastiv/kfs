@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    const console_font_path = "fonts/ter-v16n.psf";
+    const console_font_path = "fonts/ter-v32n.psf";
     const psf_step = b.addRunArtifact(psf_to_bin);
     psf_step.addPrefixedFileArg("--input-file=", b.path(console_font_path));
     const console_font = psf_step.addPrefixedOutputFileArg("--output-file=", console_font_path);

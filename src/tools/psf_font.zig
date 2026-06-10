@@ -41,7 +41,7 @@ pub const psf1 = struct {
 
                 var glyph: u16 = 0;
                 for (unicode_table) |entry| {
-                    assert(entry != 0xfffe);
+                    assert(entry != 0xfffe); // we don't support sequences
                     if (entry == 0xffff) {
                         glyph += 1;
                         continue;
@@ -105,7 +105,7 @@ pub const psf2 = struct {
                 var i: u16 = 0;
                 while (i < unicode_table.len) : (i += 1) {
                     var unicode: u21 = unicode_table[i];
-                    assert(unicode != 0xfe);
+                    assert(unicode != 0xfe); // we don't support sequences
 
                     if (unicode == 0xff) {
                         glyph += 1;
@@ -155,7 +155,6 @@ pub const psf2 = struct {
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
     const arena = init.arena;
-
     const allocator = arena.allocator();
 
     const args = try init.minimal.args.toSlice(allocator);
@@ -180,19 +179,19 @@ pub fn main(init: std.process.Init) !void {
         if (output_filepath == null) std.process.fatal("missing output file", .{});
     }
 
-    const bytes = try std.Io.Dir.cwd().readFileAlloc(
+    const data = try std.Io.Dir.cwd().readFileAlloc(
         io,
         input_filepath.?,
         allocator,
         .limited(1024 * 1024 * 64),
     );
 
-    const is_psf1 = psf1.magic == std.mem.bytesToValue(u16, bytes[0..2]);
-    const is_psf2 = psf2.magic == std.mem.bytesToValue(u32, bytes[0..4]);
+    const is_psf1 = psf1.magic == std.mem.bytesToValue(u16, data[0..2]);
+    const is_psf2 = psf2.magic == std.mem.bytesToValue(u32, data[0..4]);
     const font = if (is_psf1)
-        try psf1.parse(allocator, bytes)
+        try psf1.parse(allocator, data)
     else if (is_psf2)
-        try psf2.parse(allocator, bytes)
+        try psf2.parse(allocator, data)
     else
         std.process.fatal("not a psf file", .{});
 
@@ -203,26 +202,36 @@ pub fn main(init: std.process.Init) !void {
     var output_writer = output.writer(io, &buffer);
     const writer = &output_writer.interface;
 
-    var glyph: u16 = 'b';
-    if (font.unicode_map) |unicode| {
-        glyph = unicode[glyph];
-    }
+    try writer.writeInt(u32, font.bytes_per_row, .little);
+    try writer.writeInt(u32, font.glyph_height, .little);
 
-    const start = glyph * font.bytes_per_glyph;
-    const glyph_bytes = font.glyphs[start .. start + font.bytes_per_glyph];
-
-    for (glyph_bytes) |byte| {
-        for (0..8) |i| {
-            const bit = 7 - i;
-            const mask: u8 = @as(u8, 1) << @intCast(bit);
-            if (byte & mask != 0) {
-                try writer.writeByte('1');
-            } else {
-                try writer.writeByte('0');
-            }
+    for (' '..'~' + 1) |c| {
+        var glyph: u16 = @intCast(c);
+        if (font.unicode_map) |unicode| {
+            glyph = unicode[glyph];
         }
 
-        try writer.writeByte('\n');
+        const start = glyph * font.bytes_per_glyph;
+        const glyph_bytes = font.glyphs[start .. start + font.bytes_per_glyph];
+
+        try writer.writeAll(glyph_bytes);
+
+        // var window = std.mem.window(u8, glyph_bytes, font.bytes_per_row, font.bytes_per_row);
+        // while (window.next()) |bytes| {
+        //     for (bytes) |byte| {
+        //         for (0..8) |i| {
+        //             const bit = 7 - i;
+        //             const mask: u8 = @as(u8, 1) << @intCast(bit);
+        //             if (byte & mask != 0) {
+        //                 std.debug.print("1", .{});
+        //             } else {
+        //                 std.debug.print("0", .{});
+        //             }
+        //         }
+        //     }
+
+        //     std.debug.print("\n", .{});
+        // }
     }
 
     try writer.flush();
