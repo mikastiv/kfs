@@ -1,5 +1,10 @@
 const std = @import("std");
 
+const Bootloader = enum {
+    multiboot,
+    limine,
+};
+
 pub fn build(b: *std.Build) void {
     const Target = std.Target.x86;
     const target = b.resolveTargetQuery(.{
@@ -10,6 +15,21 @@ pub fn build(b: *std.Build) void {
         .cpu_features_sub = Target.featureSet(&.{ .avx, .avx2, .sse, .sse2, .mmx }),
     });
     const optimize = b.standardOptimizeOption(.{});
+    const host_target = b.standardTargetOptions(.{});
+
+    const psf_to_bin = b.addExecutable(.{
+        .name = "psf_to_bin",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tools/psf_font.zig"),
+            .target = host_target,
+            .optimize = optimize,
+        }),
+    });
+
+    const console_font_path = "fonts/ter-v16n.psf";
+    const psf_step = b.addRunArtifact(psf_to_bin);
+    psf_step.addPrefixedFileArg("--input-file=", b.path(console_font_path));
+    const console_font = psf_step.addPrefixedOutputFileArg("--output-file=", console_font_path);
 
     const kernel = b.addExecutable(.{
         .name = "kfs",
@@ -21,20 +41,30 @@ pub fn build(b: *std.Build) void {
             .strip = false,
         }),
     });
-    kernel.setLinkerScript(b.path("src/kernel/i386/linker.ld"));
+    kernel.root_module.addAnonymousImport("console_font", .{ .root_source_file = console_font });
     b.installArtifact(kernel);
 
     const kernel_path = kernel.getEmittedBin();
     const iso = b.getInstallPath(.bin, "kfs.iso");
 
-    const wf = b.addWriteFiles();
-    _ = wf.add("boot/grub/grub.cfg",
+    const run_cmd = b.addRunArtifact(kernel);
+    if (b.args) |args| {
+        run_cmd.addArgs(args);
+    }
+
+    const run_step = b.step("run", "Run the kernel");
+    run_step.dependOn(&run_cmd.step);
+
+    kernel.setLinkerScript(b.path("src/kernel/i386/linker.ld"));
+
+    const grub_wf = b.addWriteFiles();
+    _ = grub_wf.add("boot/grub/grub.cfg",
         \\menuentry "kfs" {
         \\    multiboot /boot/kfs
         \\}
     );
-    _ = wf.addCopyFile(kernel_path, "boot/kfs");
-    const isodir = wf.getDirectory();
+    _ = grub_wf.addCopyFile(kernel_path, "boot/kfs");
+    const isodir = grub_wf.getDirectory();
 
     const grub_mkrescue = b.addSystemCommand(&.{"grub-mkrescue"});
     grub_mkrescue.addArgs(&.{ "-o", iso });
@@ -45,12 +75,5 @@ pub fn build(b: *std.Build) void {
     qemu_cmd.addArgs(&.{ "-cdrom", iso });
     qemu_cmd.step.dependOn(&grub_mkrescue.step);
 
-    const run_cmd = b.addRunArtifact(kernel);
     run_cmd.step.dependOn(&qemu_cmd.step);
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
 }

@@ -6,6 +6,8 @@ pub const panic = @import("panic.zig").panic;
 const multiboot = @import("multiboot.zig");
 const tty = @import("tty.zig");
 
+const font = @embedFile("console_font");
+
 const multiboot_flags: multiboot.Header.Flags = .{
     .module_align = true,
     .mem_info = true,
@@ -66,6 +68,8 @@ noinline fn kmain(magic: u32, info: *multiboot.Info) callconv(.c) noreturn {
     tty.init();
 
     tty.print("magic: {x}\n", .{magic});
+
+    tty.print("{s}", .{font});
 
     const raw_pixels: [*]u8 = @ptrFromInt(@as(u32, @truncate(info.framebuffer.addr)));
     const framebuffer_size = info.framebuffer.pitch * info.framebuffer.height;
