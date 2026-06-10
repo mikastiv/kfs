@@ -20,7 +20,7 @@ pub fn build(b: *std.Build) void {
     const psf_to_bin = b.addExecutable(.{
         .name = "psf_to_bin",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tools/psf_font.zig"),
+            .root_source_file = b.path("src/tools/psf_font_parser.zig"),
             .target = host_target,
             .optimize = optimize,
         }),

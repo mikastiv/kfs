@@ -25,6 +25,10 @@ pub fn clear() void {
     @memset(buffer, vga.entry(' ', color));
 }
 
+pub fn setColor(fg: vga.Color, bg: vga.Color) void {
+    color = .{ .fg = fg, .bg = bg };
+}
+
 pub fn putChar(char: u8) void {
     switch (char) {
         '\n' => {
