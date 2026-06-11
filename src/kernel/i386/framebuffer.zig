@@ -23,7 +23,7 @@ var blue_index: u32 = 0;
 var column: usize = 0;
 var row: usize = 0;
 
-pub const ConsoleFont = struct {
+const ConsoleFont = struct {
     bytes_per_row: u32,
     bytes_per_glyph: u32,
     glyph_height: u32,
@@ -73,9 +73,10 @@ pub fn init(info: *const multiboot.Info) void {
     assert(info.framebuffer.mode.rgb.red_mask_size == 8);
     assert(info.framebuffer.mode.rgb.green_mask_size == 8);
     assert(info.framebuffer.mode.rgb.blue_mask_size == 8);
+    assert(info.framebuffer.bpp == 32);
 
     font = .init(font_binary);
-    fg = .white;
+    fg = .orange;
     bg = .black;
 
     const raw_pixels: [*]u8 = @ptrFromInt(@as(u32, @truncate(info.framebuffer.addr)));
@@ -109,20 +110,18 @@ pub fn putPixel(x: u32, y: u32, color: Color) void {
     assert(y < height);
 
     const index = (y * pitch) + (x * bpp / 8);
-    switch (bpp) {
-        32 => {
-            pixels[index + blue_index] = color.b;
-            pixels[index + green_index] = color.g;
-            pixels[index + red_index] = color.r;
-        },
-        else => @panic("unsupported bpp"),
-    }
+    pixels[index + blue_index] = color.b;
+    pixels[index + green_index] = color.g;
+    pixels[index + red_index] = color.r;
 }
 
 pub fn putCharAt(char: u8, cx: u32, cy: u32) void {
     assert(std.ascii.isPrint(char));
+    assert(cx < cursor_width);
+    assert(cy < cursor_height);
 
-    const glyph_start = font.bytes_per_glyph * (char - ' ');
+    const first_char = ' '; // The binary file has only printable ascii starting with space.
+    const glyph_start = font.bytes_per_glyph * (char - first_char);
     const glyph = font.glyphs[glyph_start .. glyph_start + font.bytes_per_glyph];
     var it = std.mem.window(u8, glyph, font.bytes_per_row, font.bytes_per_row);
 

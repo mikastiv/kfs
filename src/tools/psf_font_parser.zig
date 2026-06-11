@@ -40,8 +40,17 @@ pub const psf1 = struct {
                 @memset(map, 0xffff);
 
                 var glyph: u16 = 0;
-                for (unicode_table) |entry| {
-                    assert(entry != 0xfffe); // we don't support sequences
+                var i: usize = 0;
+                while (i < unicode_table.len) : (i += 1) {
+                    const entry = unicode_table[i];
+
+                    // Skip unicode sequences
+                    if (entry == 0xfffe) {
+                        while (unicode_table[i] != 0xffff) {
+                            i += 1;
+                        }
+                    }
+
                     if (entry == 0xffff) {
                         glyph += 1;
                         continue;
@@ -105,7 +114,13 @@ pub const psf2 = struct {
                 var i: u16 = 0;
                 while (i < unicode_table.len) : (i += 1) {
                     var unicode: u21 = unicode_table[i];
-                    assert(unicode != 0xfe); // we don't support sequences
+
+                    // Skip unicode sequences
+                    if (unicode == 0xfe) {
+                        while (unicode_table[i] != 0xff) {
+                            i += 1;
+                        }
+                    }
 
                     if (unicode == 0xff) {
                         glyph += 1;
@@ -205,6 +220,7 @@ pub fn main(init: std.process.Init) !void {
     try writer.writeInt(u32, font.bytes_per_row, .little);
     try writer.writeInt(u32, font.glyph_height, .little);
 
+    // Only care about ASCII printable characters
     for (' '..'~' + 1) |c| {
         var glyph: u16 = @intCast(c);
         if (font.unicode_map) |unicode| {
