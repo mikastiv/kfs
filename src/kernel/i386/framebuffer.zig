@@ -3,22 +3,23 @@ const assert = std.debug.assert;
 
 const multiboot = @import("multiboot.zig");
 
-const font_binary = @embedFile("console_font");
+const font: ConsoleFont = .init(@embedFile("console_font"));
 
-var pixels: []u8 = undefined;
+// These should not change after init
 var bpp: u32 = 0;
 var pitch: u32 = 0;
 var width: u32 = 0;
 var height: u32 = 0;
 var cursor_width: u32 = 0;
 var cursor_height: u32 = 0;
-var font: ConsoleFont = undefined;
-var fg: Color = .white;
-var bg: Color = .black;
-
 var red_index: u32 = 0;
 var green_index: u32 = 0;
 var blue_index: u32 = 0;
+
+var pixels: []u8 = undefined;
+
+var fg: Color = .white;
+var bg: Color = .black;
 
 var column: usize = 0;
 var row: usize = 0;
@@ -75,7 +76,6 @@ pub fn init(info: *const multiboot.Info) void {
     assert(info.framebuffer.mode.rgb.blue_mask_size == 8);
     assert(info.framebuffer.bpp == 32);
 
-    font = .init(font_binary);
     fg = .orange;
     bg = .black;
 
@@ -103,6 +103,8 @@ pub fn init(info: *const multiboot.Info) void {
 
 pub fn clear() void {
     @memset(std.mem.bytesAsSlice(u32, pixels), bg.toInt());
+    row = 0;
+    column = 0;
 }
 
 pub fn putPixel(x: u32, y: u32, color: Color) void {

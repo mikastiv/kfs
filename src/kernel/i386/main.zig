@@ -6,6 +6,7 @@ pub const panic = @import("panic.zig").panic;
 const multiboot = @import("multiboot.zig");
 const tty = @import("tty.zig");
 const framebuffer = @import("framebuffer.zig");
+const gdt = @import("gdt.zig");
 
 const multiboot_flags: multiboot.Header.Flags = .{
     .module_align = true,
@@ -42,6 +43,8 @@ export fn _start() callconv(.naked) noreturn {
 }
 
 noinline fn kmain(magic: u32, info: *multiboot.Info) callconv(.c) noreturn {
+    gdt.init();
+
     tty.init();
     framebuffer.init(info);
 

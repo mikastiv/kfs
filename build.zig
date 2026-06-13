@@ -80,6 +80,7 @@ pub fn build(b: *std.Build) void {
 
     const qemu_cmd = b.addSystemCommand(&.{"qemu-system-x86_64"});
     qemu_cmd.addArgs(&.{ "-cdrom", iso });
+    // qemu_cmd.addArgs(&.{ "-d", "int", "-no-shutdown" });
     qemu_cmd.step.dependOn(&grub_mkrescue.step);
 
     run_cmd.step.dependOn(&qemu_cmd.step);

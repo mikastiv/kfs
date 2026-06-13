@@ -2,6 +2,13 @@ ENTRY(_start)
 
 SECTIONS
 {
+    . = 0x0800;
+
+    .gdt :
+    {
+        KEEP(*(.gdt))
+    }
+
     . = 2M;
 
     .text : ALIGN(4K)

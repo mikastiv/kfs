@@ -10,9 +10,10 @@ const height = 25;
 const size = width * height;
 const buffer = @as([*]volatile u16, @ptrFromInt(0xb8000))[0..size];
 
+var color: vga.EntryColor = .default;
+
 var row: usize = 0;
 var column: usize = 0;
-var color: vga.EntryColor = .default;
 
 pub fn init() void {
     row = 0;
@@ -23,6 +24,8 @@ pub fn init() void {
 
 pub fn clear() void {
     @memset(buffer, vga.entry(' ', color));
+    row = 0;
+    column = 0;
 }
 
 pub fn setColor(fg: vga.Color, bg: vga.Color) void {
