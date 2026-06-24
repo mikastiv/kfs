@@ -9,21 +9,25 @@ const GdtEntry = packed struct(u64) {
     flags: Flags,
     base_hi: u8,
 
+    const DescriptorType = enum(u1) {
+        task_state = 0,
+        code_or_data = 1,
+    };
+
+    const PrivilegeLevel = enum(u2) {
+        ring0 = 0,
+        ring1 = 1,
+        ring2 = 2,
+        ring3 = 3,
+    };
+
     const Access = packed struct(u8) {
-        accessed: bool = false,
+        accessed: bool = true,
         readable_or_writable: bool,
         direction_or_conforming: bool,
         executable: bool,
-        descriptor_type: enum(u1) {
-            task_state = 0,
-            code_or_data = 1,
-        },
-        descriptor_privilege: enum(u2) {
-            ring0 = 0,
-            ring1 = 1,
-            ring2 = 2,
-            ring3 = 3,
-        },
+        descriptor_type: DescriptorType,
+        privilege_level: PrivilegeLevel,
         present: bool,
 
         const zero: Access = std.mem.zeroes(Access);
@@ -54,14 +58,69 @@ const GdtEntry = packed struct(u64) {
             .flags = flags,
         };
     }
+
+    fn initCode(
+        base: u32,
+        limit: u20,
+        readable: bool,
+        conforming: bool,
+        descriptor_type: DescriptorType,
+        descriptor_privilege: PrivilegeLevel,
+        present: bool,
+        flags: Flags,
+    ) GdtEntry {
+        return GdtEntry.init(
+            base,
+            limit,
+            .{
+                .readable_or_writable = readable,
+                .executable = true,
+                .direction_or_conforming = conforming,
+                .descriptor_type = descriptor_type,
+                .privilege_level = descriptor_privilege,
+                .present = present,
+            },
+            flags,
+        );
+    }
+
+    fn initData(
+        base: u32,
+        limit: u20,
+        writable: bool,
+        direction: enum(u1) { expand_up = 0, expand_down = 1 },
+        descriptor_type: DescriptorType,
+        descriptor_privilege: PrivilegeLevel,
+        present: bool,
+        flags: Flags,
+    ) GdtEntry {
+        return GdtEntry.init(
+            base,
+            limit,
+            .{
+                .readable_or_writable = writable,
+                .executable = false,
+                .direction_or_conforming = @bitCast(@intFromEnum(direction)),
+                .descriptor_type = descriptor_type,
+                .privilege_level = descriptor_privilege,
+                .present = present,
+            },
+            flags,
+        );
+    }
 };
 
-const GdtDescriptor = extern struct {
-    limit: u16 align(1),
-    base: [*]GdtEntry align(1),
+const GdtDescriptor = packed struct(u48) {
+    limit: u16,
+    base: u32,
 };
 
 pub fn init() void {
+    const gdt_descriptor: GdtDescriptor = .{
+        .limit = @sizeOf(@TypeOf(gdt)) - 1,
+        .base = @intFromPtr(&gdt),
+    };
+
     load(&gdt_descriptor, code_segment, data_segment);
 }
 
@@ -87,50 +146,67 @@ fn load(descriptor: *const GdtDescriptor, code_seg: u16, data_seg: u16) void {
 const code_segment = 1 * @sizeOf(GdtEntry);
 const data_segment = 2 * @sizeOf(GdtEntry);
 
-var gdt: [3]GdtEntry linksection(".gdt") = .{
+export var gdt: [5]GdtEntry linksection(".gdt") = .{
     // Null descriptor
     .init(0, 0, GdtEntry.Access.zero, GdtEntry.Flags.zero),
-
     // Kernel 32bit code segment
-    .init(
+    .initCode(
         0,
         0xfffff,
-        .{
-            .readable_or_writable = true,
-            .executable = true,
-            .direction_or_conforming = false,
-            .descriptor_type = .code_or_data,
-            .descriptor_privilege = .ring0,
-            .present = true,
-        },
+        true,
+        false,
+        .code_or_data,
+        .ring0,
+        true,
         .{
             .@"64bit" = false,
             .size = .@"32bit",
             .granularity = .@"4Kb",
         },
     ),
-
     // Kernel 32bit data segment
-    .init(
+    .initData(
         0,
         0xfffff,
-        .{
-            .readable_or_writable = true,
-            .executable = false,
-            .direction_or_conforming = false,
-            .descriptor_type = .code_or_data,
-            .descriptor_privilege = .ring0,
-            .present = true,
-        },
+        true,
+        .expand_up,
+        .code_or_data,
+        .ring0,
+        true,
         .{
             .@"64bit" = false,
             .size = .@"32bit",
             .granularity = .@"4Kb",
         },
     ),
-};
-
-const gdt_descriptor: GdtDescriptor = .{
-    .limit = @sizeOf(@TypeOf(gdt)) - 1,
-    .base = &gdt,
+    // User 32bit code segment
+    .initCode(
+        0,
+        0xfffff,
+        true,
+        false,
+        .code_or_data,
+        .ring3,
+        true,
+        .{
+            .@"64bit" = false,
+            .size = .@"32bit",
+            .granularity = .@"4Kb",
+        },
+    ),
+    // User 32bit data segment
+    .initData(
+        0,
+        0xfffff,
+        true,
+        .expand_up,
+        .code_or_data,
+        .ring3,
+        true,
+        .{
+            .@"64bit" = false,
+            .size = .@"32bit",
+            .granularity = .@"4Kb",
+        },
+    ),
 };
