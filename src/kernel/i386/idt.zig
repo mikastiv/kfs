@@ -3,6 +3,8 @@ const assert = std.debug.assert;
 
 const gdt = @import("gdt.zig");
 const isr = @import("isr.zig");
+const isr_entries = @import("isr_entries.zig");
+const interrupts = @import("interrupts.zig");
 
 const IdtEntry = packed struct(u64) {
     offset_lo: u16,
@@ -36,6 +38,8 @@ const IdtDescriptor = packed struct(u48) {
     base: u32,
 };
 
+var idt: [interrupts.count]IdtEntry = @splat(std.mem.zeroes(IdtEntry));
+
 pub fn enableGate(interrupt: u8) void {
     idt[interrupt].attributes.present = true;
 }
@@ -52,21 +56,16 @@ pub fn init() void {
 
     load(&descriptor);
 
-    initGates();
-    for (0..5) |i| {
+    inline for (0..interrupts.count) |i| {
+        @setEvalBranchQuota(50000);
+        const name = std.fmt.comptimePrint("isr{d}", .{i});
+        const ptr = &@field(isr_entries, name);
+        setGate(@intCast(i), ptr, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
         enableGate(@intCast(i));
     }
-}
 
-fn load(descriptor: *const IdtDescriptor) void {
-    asm volatile (
-        \\ lidt (%[ptr])
-        :
-        : [ptr] "r" (descriptor),
-    );
+    disableGate(50);
 }
-
-var idt: [256]IdtEntry = @splat(std.mem.zeroes(IdtEntry));
 
 fn setGate(
     interrupt: u8,
@@ -84,10 +83,10 @@ fn setGate(
     };
 }
 
-fn initGates() void {
-    setGate(0, &isr.isr0, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
-    setGate(1, &isr.isr1, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
-    setGate(2, &isr.isr2, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
-    setGate(3, &isr.isr3, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
-    setGate(4, &isr.isr3, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
+fn load(descriptor: *const IdtDescriptor) void {
+    asm volatile (
+        \\ lidt (%[ptr])
+        :
+        : [ptr] "r" (descriptor),
+    );
 }
