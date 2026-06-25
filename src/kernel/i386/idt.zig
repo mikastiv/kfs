@@ -1,6 +1,9 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
+const gdt = @import("gdt.zig");
+const isr = @import("isr.zig");
+
 const IdtEntry = packed struct(u64) {
     offset_lo: u16,
     segment_selector: u16,
@@ -24,7 +27,7 @@ const IdtEntry = packed struct(u64) {
             ring2 = 2,
             ring3 = 3,
         },
-        present: bool,
+        present: bool = false,
     };
 };
 
@@ -32,32 +35,6 @@ const IdtDescriptor = packed struct(u48) {
     limit: u16,
     base: u32,
 };
-
-fn load(descriptor: *const IdtDescriptor) void {
-    asm volatile (
-        \\ lidt (%[ptr])
-        :
-        : [ptr] "r" (descriptor),
-    );
-}
-
-export var idt: [256]IdtEntry = @splat(std.mem.zeroes(IdtEntry));
-
-fn setGate(
-    interrupt: u8,
-    entry_point: *anyopaque,
-    segment_descriptor: u16,
-    attributes: IdtEntry.Attributes,
-) void {
-    const offset: u32 = @intFromPtr(entry_point);
-
-    idt[interrupt] = .{
-        .offset_lo = @intCast(offset & 0xffff),
-        .segment_selector = segment_descriptor,
-        .attributes = attributes,
-        .offset_hi = @intCast((offset >> 16) & 0xffff),
-    };
-}
 
 pub fn enableGate(interrupt: u8) void {
     idt[interrupt].attributes.present = true;
@@ -74,4 +51,43 @@ pub fn init() void {
     };
 
     load(&descriptor);
+
+    initGates();
+    for (0..5) |i| {
+        enableGate(@intCast(i));
+    }
+}
+
+fn load(descriptor: *const IdtDescriptor) void {
+    asm volatile (
+        \\ lidt (%[ptr])
+        :
+        : [ptr] "r" (descriptor),
+    );
+}
+
+var idt: [256]IdtEntry = @splat(std.mem.zeroes(IdtEntry));
+
+fn setGate(
+    interrupt: u8,
+    entry_point: anytype,
+    segment_descriptor: u16,
+    attributes: IdtEntry.Attributes,
+) void {
+    const offset: u32 = @intFromPtr(entry_point);
+
+    idt[interrupt] = .{
+        .offset_lo = @intCast(offset & 0xffff),
+        .segment_selector = segment_descriptor,
+        .attributes = attributes,
+        .offset_hi = @intCast((offset >> 16) & 0xffff),
+    };
+}
+
+fn initGates() void {
+    setGate(0, &isr.isr0, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
+    setGate(1, &isr.isr1, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
+    setGate(2, &isr.isr2, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
+    setGate(3, &isr.isr3, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
+    setGate(4, &isr.isr3, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
 }

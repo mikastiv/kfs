@@ -115,38 +115,10 @@ const GdtDescriptor = packed struct(u48) {
     base: u32,
 };
 
-pub fn init() void {
-    const gdt_descriptor: GdtDescriptor = .{
-        .limit = @sizeOf(@TypeOf(gdt)) - 1,
-        .base = @intFromPtr(&gdt),
-    };
+pub const code_segment = 1 * @sizeOf(GdtEntry);
+pub const data_segment = 2 * @sizeOf(GdtEntry);
 
-    load(&gdt_descriptor, code_segment, data_segment);
-}
-
-fn load(descriptor: *const GdtDescriptor, code_seg: u16, data_seg: u16) void {
-    asm volatile (
-        \\ lgdt (%[ptr])
-        \\ mov %[data], %%ds
-        \\ mov %[data], %%es
-        \\ mov %[data], %%fs
-        \\ mov %[data], %%gs
-        \\ mov %[data], %%ss
-        \\ pushl %[code]
-        \\ pushl $1f
-        \\ lretl
-        \\1:
-        :
-        : [ptr] "r" (descriptor),
-          [code] "r" (@as(u32, code_seg)),
-          [data] "r" (data_seg),
-    );
-}
-
-const code_segment = 1 * @sizeOf(GdtEntry);
-const data_segment = 2 * @sizeOf(GdtEntry);
-
-export var gdt: [5]GdtEntry linksection(".gdt") = .{
+var gdt: [5]GdtEntry linksection(".gdt") = .{
     // Null descriptor
     .init(0, 0, GdtEntry.Access.zero, GdtEntry.Flags.zero),
     // Kernel 32bit code segment
@@ -210,3 +182,31 @@ export var gdt: [5]GdtEntry linksection(".gdt") = .{
         },
     ),
 };
+
+pub fn init() void {
+    const gdt_descriptor: GdtDescriptor = .{
+        .limit = @sizeOf(@TypeOf(gdt)) - 1,
+        .base = @intFromPtr(&gdt),
+    };
+
+    load(&gdt_descriptor, code_segment, data_segment);
+}
+
+fn load(descriptor: *const GdtDescriptor, code_seg: u16, data_seg: u16) void {
+    asm volatile (
+        \\ lgdt (%[ptr])
+        \\ mov %[data], %%ds
+        \\ mov %[data], %%es
+        \\ mov %[data], %%fs
+        \\ mov %[data], %%gs
+        \\ mov %[data], %%ss
+        \\ pushl %[code]
+        \\ pushl $1f
+        \\ lretl
+        \\1:
+        :
+        : [ptr] "r" (descriptor),
+          [code] "r" (@as(u32, code_seg)),
+          [data] "r" (data_seg),
+    );
+}
