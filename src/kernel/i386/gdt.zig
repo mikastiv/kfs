@@ -118,7 +118,7 @@ const GdtDescriptor = packed struct(u48) {
 pub const code_segment = 1 * @sizeOf(GdtEntry);
 pub const data_segment = 2 * @sizeOf(GdtEntry);
 
-var gdt: [5]GdtEntry linksection(".gdt") = .{
+export var gdt: [5]GdtEntry linksection(".gdt") = .{
     // Null descriptor
     .init(0, 0, GdtEntry.Access.zero, GdtEntry.Flags.zero),
     // Kernel 32bit code segment

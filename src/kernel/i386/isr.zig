@@ -22,7 +22,44 @@ pub const InterruptFrame = extern struct {
     eflags: u32,
 };
 
-pub export fn vectorCommon() callconv(.naked) void {
+pub const HandlerFn = *const fn (frame: *const InterruptFrame) void;
+
+const intel_reserved_exception_count = 32;
+
+var handlers: [interrupts.count]?HandlerFn = @splat(null);
+
+pub const vectorStubs = blk: {
+    var table: [interrupts.count]*const fn () callconv(.naked) noreturn = undefined;
+
+    for (0..interrupts.count) |i| {
+        table[i] = generateVectorStub(i);
+    }
+
+    break :blk table;
+};
+
+fn generateVectorStub(comptime interrupt: u32) *const fn () callconv(.naked) noreturn {
+    return struct {
+        fn func() callconv(.naked) noreturn {
+            const info = interrupts.vector_info[interrupt];
+            if (!info.has_error_code) {
+                // push dummy error code
+                asm volatile ("push $0x00");
+            }
+
+            // push interrupt number and jump to common code
+            asm volatile (
+                \\ push %[int]
+                \\ jmp %[common:P]
+                :
+                : [int] "i" (interrupt),
+                  [common] "X" (&vectorCommon),
+            );
+        }
+    }.func;
+}
+
+fn vectorCommon() callconv(.naked) void {
     asm volatile (
         \\ pusha                 # push eax, ecx, edx, ebx, esp, ebp, esi, edi
         \\
@@ -58,13 +95,15 @@ pub export fn vectorCommon() callconv(.naked) void {
 }
 
 export fn handleInterrupt(frame: *const InterruptFrame) callconv(.c) void {
+    const info = interrupts.vector_info[frame.interrupt];
+
     if (handlers[frame.interrupt]) |handler| {
         handler(frame);
     } else if (frame.interrupt >= intel_reserved_exception_count) {
-        framebuffer.print("Unhandled Interrupt: 0x{x:0>2} ({d})\n", .{ frame.interrupt, frame.interrupt });
+        framebuffer.print("Unhandled Interrupt {d}\n", .{frame.interrupt});
     } else {
-        framebuffer.print("Unhandled Exception: Vector 0x{x:0>2} ({d}): {s}\n", .{ frame.interrupt, frame.interrupt, exception_descriptions[frame.interrupt] });
-        if (std.mem.findScalar(u32, &interrupts.with_error_code, frame.interrupt) != null) {
+        framebuffer.print("Unhandled Exception {d}: {s}\n", .{ frame.interrupt, info.description });
+        if (info.has_error_code) {
             framebuffer.print("Error Code: {d}\n", .{frame.error_code});
         }
         framebuffer.print("eax: {x:0>8}, ebx: {x:0>8}, ecx: {x:0>8}, edx: {x:0>8}, ebp: {x:0>8}, esp: {x:0>8}\n", .{
@@ -86,43 +125,3 @@ export fn handleInterrupt(frame: *const InterruptFrame) callconv(.c) void {
         @panic("unhandled exception");
     }
 }
-
-const intel_reserved_exception_count = 32;
-const exception_descriptions: [intel_reserved_exception_count][]const u8 = .{
-    "Divide Error",
-    "Debug Exception",
-    "NMI Interrupt",
-    "Breakpoint",
-    "Overflow",
-    "BOUND Range Exceeded",
-    "Invalid Opcode",
-    "Device Not Available (No Math Coprocessor)",
-    "Double Fault",
-    "Coprocessor Segment Overrun",
-    "Invalid TSS",
-    "Segment Not Present",
-    "Stack-Segment Fault",
-    "General Protection",
-    "Page Fault",
-    "Intel Reserved",
-    "x87 FPU Floating-Point Error (Math Fault)",
-    "Alignment Check",
-    "Machine Check",
-    "SIMD Floating-Point Exception",
-    "Virtualization Exception",
-    "Control Protection Exception",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "Hypervisor Injection Exception",
-    "VMM Communication Exception",
-    "Security Exception",
-    "",
-};
-
-pub const HandlerFn = *const fn (frame: *const InterruptFrame) void;
-
-var handlers: [interrupts.count]?HandlerFn = @splat(null);

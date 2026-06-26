@@ -36,21 +36,6 @@ pub fn build(b: *std.Build) void {
     psf_step.addPrefixedFileArg("--input-file=", b.path(console_font_path));
     const console_font = psf_step.addPrefixedOutputFileArg("--output-file=", console_font_path);
 
-    const isr_generator = b.addExecutable(.{
-        .name = "isr_generator",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tools/i386/isr_generator.zig"),
-            .target = host_target,
-            .optimize = optimize,
-        }),
-    });
-    isr_generator.root_module.addAnonymousImport("interrupts", .{
-        .root_source_file = b.path("src/kernel/i386/interrupts.zig"),
-    });
-
-    const isr_generate_step = b.addRunArtifact(isr_generator);
-    isr_generate_step.addPrefixedFileArg("--output-file=", b.path("src/kernel/i386/isr_vectors.zig"));
-
     const kernel = b.addExecutable(.{
         .name = "kfs",
         .root_module = b.createModule(.{
@@ -62,7 +47,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     kernel.root_module.addAnonymousImport("console_font", .{ .root_source_file = console_font });
-    kernel.step.dependOn(&isr_generate_step.step);
     b.installArtifact(kernel);
 
     const kernel_path = kernel.getEmittedBin();

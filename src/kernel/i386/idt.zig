@@ -3,7 +3,6 @@ const assert = std.debug.assert;
 
 const gdt = @import("gdt.zig");
 const isr = @import("isr.zig");
-const isr_vectors = @import("isr_vectors.zig");
 const interrupts = @import("interrupts.zig");
 
 const IdtEntry = packed struct(u64) {
@@ -31,6 +30,15 @@ const IdtEntry = packed struct(u64) {
         },
         present: bool = false,
     };
+
+    fn init(offset: u32, segment_descriptor: u16, attributes: Attributes) IdtEntry {
+        return .{
+            .offset_lo = @intCast(offset & 0xffff),
+            .segment_selector = segment_descriptor,
+            .attributes = attributes,
+            .offset_hi = @intCast((offset >> 16) & 0xffff),
+        };
+    }
 };
 
 const IdtDescriptor = packed struct(u48) {
@@ -56,11 +64,13 @@ pub fn init() void {
 
     load(&descriptor);
 
-    inline for (0..interrupts.count) |i| {
-        @setEvalBranchQuota(50000);
-        const name = std.fmt.comptimePrint("isr{d}", .{i});
-        const ptr = &@field(isr_vectors, name);
-        setGate(@intCast(i), ptr, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
+    for (0..interrupts.count) |i| {
+        setGate(
+            @intCast(i),
+            isr.vectorStubs[i],
+            gdt.code_segment,
+            .{ .gate_type = .interrupt_32, .privilege_level = .ring0 },
+        );
         enableGate(@intCast(i));
     }
 }
@@ -71,14 +81,12 @@ fn setGate(
     segment_descriptor: u16,
     attributes: IdtEntry.Attributes,
 ) void {
+    const type_info = @typeInfo(@TypeOf(entry_point));
+    comptime assert(type_info == .pointer);
+
     const offset: u32 = @intFromPtr(entry_point);
 
-    idt[interrupt] = .{
-        .offset_lo = @intCast(offset & 0xffff),
-        .segment_selector = segment_descriptor,
-        .attributes = attributes,
-        .offset_hi = @intCast((offset >> 16) & 0xffff),
-    };
+    idt[interrupt] = .init(offset, segment_descriptor, attributes);
 }
 
 fn load(descriptor: *const IdtDescriptor) void {
