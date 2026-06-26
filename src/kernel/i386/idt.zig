@@ -3,7 +3,7 @@ const assert = std.debug.assert;
 
 const gdt = @import("gdt.zig");
 const isr = @import("isr.zig");
-const isr_entries = @import("isr_entries.zig");
+const isr_vectors = @import("isr_vectors.zig");
 const interrupts = @import("interrupts.zig");
 
 const IdtEntry = packed struct(u64) {
@@ -59,12 +59,10 @@ pub fn init() void {
     inline for (0..interrupts.count) |i| {
         @setEvalBranchQuota(50000);
         const name = std.fmt.comptimePrint("isr{d}", .{i});
-        const ptr = &@field(isr_entries, name);
+        const ptr = &@field(isr_vectors, name);
         setGate(@intCast(i), ptr, gdt.code_segment, .{ .gate_type = .interrupt_32, .privilege_level = .ring0 });
         enableGate(@intCast(i));
     }
-
-    disableGate(50);
 }
 
 fn setGate(

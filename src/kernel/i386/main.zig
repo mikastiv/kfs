@@ -32,10 +32,10 @@ var stack_bytes: [16 * 1024]u8 align(16) linksection(".bss") = undefined;
 
 export fn _start() callconv(.naked) noreturn {
     asm volatile (
-        \\ movl %[stack_top], %%esp
+        \\ movl %[stack_top], %%esp   # load stack ptr
         \\ movl %%esp, %%ebp
-        \\ pushl %%ebx
-        \\ pushl %%eax
+        \\ pushl %%ebx                # push multiboot magic
+        \\ pushl %%eax                # push multiboot info
         \\ call %[kmain:P]
         :
         : [stack_top] "i" (stack_bytes[stack_bytes.len..].ptr),
@@ -52,13 +52,8 @@ noinline fn kmain(magic: u32, info: *multiboot.Info) callconv(.c) noreturn {
     tty.init();
     framebuffer.init(info);
 
-    tty.print("multiboot magic: 0x{x}\n", .{magic});
-    tty.print("Hello, Kernel!\n", .{});
-
     framebuffer.print("multiboot magic: 0x{x}\n", .{magic});
     framebuffer.print("Hello, Kernel!\n", .{});
-
-    asm volatile ("int $50");
 
     while (true) {
         asm volatile ("hlt");

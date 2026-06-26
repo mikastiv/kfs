@@ -33,7 +33,8 @@ pub fn main(init: std.process.Init) !void {
     var output_writer = output_file.writer(io, &buffer);
     const writer = &output_writer.interface;
 
-    try writer.writeAll("const isr = @import(\"isr.zig\").commonEntry;\n\n");
+    try writer.writeAll("// This file was auto-generated\n\n");
+    try writer.writeAll("const common = @import(\"isr.zig\").vectorCommon;\n\n");
 
     for (0..256) |i| {
         try writer.print(
@@ -43,15 +44,15 @@ pub fn main(init: std.process.Init) !void {
         , .{i});
         if (std.mem.findScalar(u32, &interrupts.with_error_code, @intCast(i)) == null) {
             try writer.writeAll(
-                \\        \\ push $0x00
+                \\        \\ push $0x00   # push dummy error code
                 \\
             );
         }
         try writer.print(
-            \\        \\ push $0x{X:0>2}
-            \\        \\ jmp %[isr:P]
+            \\        \\ push $0x{X:0>2}   # push interrupt number
+            \\        \\ jmp %[common:P]
             \\        :
-            \\        : [isr] "X" (&isr),
+            \\        : [common] "X" (&common),
             \\    );
             \\}}
             \\

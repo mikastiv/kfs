@@ -49,7 +49,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const isr_generate_step = b.addRunArtifact(isr_generator);
-    isr_generate_step.addPrefixedFileArg("--output-file=", b.path("src/kernel/i386/isr_entries.zig"));
+    isr_generate_step.addPrefixedFileArg("--output-file=", b.path("src/kernel/i386/isr_vectors.zig"));
 
     const kernel = b.addExecutable(.{
         .name = "kfs",

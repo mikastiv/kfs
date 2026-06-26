@@ -25,7 +25,7 @@ pub const Header = extern struct {
         padding: u29 = 0,
     };
 
-    pub fn calculateChecksum(flags: Flags) u32 {
+    pub fn calculateChecksum(comptime flags: Flags) u32 {
         const f: u32 = @bitCast(flags);
         return ~(magic +% f) +% 1;
     }
